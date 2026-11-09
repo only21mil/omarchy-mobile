@@ -3,7 +3,8 @@
 # Stage omamobile-omarchy into DESTDIR. The pacman hook applies the patch
 # series after the package transaction; the module-tree cleanup's timer is
 # enabled by the wants link staged here, and Arch's linux-modules-cleanup is
-# held off by a drop-in (lib/modules-cleanup says why).
+# held off by a drop-in (lib/modules-cleanup says why). A zram-generator
+# drop-in caps swap on zram at half the RAM.
 #   ./install DESTDIR
 set -euo pipefail
 cd -- "$(dirname -- "${BASH_SOURCE[0]}")"
@@ -23,6 +24,8 @@ install -Dm644 systemd/linux-modules-cleanup.service.d/10-omamobile.conf \
   "$u/linux-modules-cleanup.service.d/10-omamobile.conf"
 install -d "$u/timers.target.wants"
 ln -sfn ../omamobile-modules-cleanup.timer "$u/timers.target.wants/omamobile-modules-cleanup.timer"
+install -Dm644 systemd/zram-generator.conf.d/95-omamobile.conf \
+  "$d/usr/lib/systemd/zram-generator.conf.d/95-omamobile.conf"
 for f in patches/*.patch; do
   install -Dm644 "$f" "$d/usr/share/omamobile/omarchy/patches/${f##*/}"
 done
