@@ -84,6 +84,28 @@ grep -q '0x35: 04 -> 06' <<<"$plan" || fail "mark-successful plans one byte (0x3
 cmp -s "$tmp/devinfo" "$tmp/devinfo.orig" || fail "a dry run writes nothing"
 pass "bootctl dry run plans one byte and writes nothing"
 
+# omamobile-boot-success skips the mark only when the booted slot's own
+# block in a dump that succeeded says successful. Its condition reads the
+# whole dump (#587; no grep -q under pipefail, AGENTS.md section 4,
+# Userspace), and is run here as written, against a stub omamobile-bootctl.
+cond=$(sed -n 's/^if \(.*omamobile-bootctl dump .*\); then$/\1/p' bin/omamobile-boot-success)
+[[ -n $cond && $cond != *'grep -q'* ]] || fail "boot-success's already-marked check is found, without grep -q"
+mkdir -p "$tmp/bs"
+printf '#!/bin/bash\ncat "$BS_DUMP"; exit "$BS_RC"\n' > "$tmp/bs/omamobile-bootctl" && chmod +x "$tmp/bs/omamobile-bootctl"
+slot() { printf 'slot %s (bytes 0x30-0x33: 00 00 00 00)\n  successful:  %s\n  retry-count: 3\n' "$1" "$2"; }
+{ slot a no; slot b yes; } > "$tmp/bs/b-yes"
+{ slot a yes; slot b no; } > "$tmp/bs/a-yes"
+: > "$tmp/bs/empty"
+skips() {  # skips <dump> <bootctl exit>: does slot b's check skip the mark?
+  BS_DUMP=$tmp/bs/$1 BS_RC=$2 BS_COND=$cond PATH="$tmp/bs:$PATH" \
+    bash -c 'set -euo pipefail; dev=/dev/sdd1 slot=b; eval "$BS_COND"'
+}
+skips b-yes 0 || fail "a marked slot b is left alone"
+! skips a-yes 0 || fail "slot a's mark doesn't count for slot b"
+! skips b-yes 1 || fail "a dump that fails is not read as marked"
+! skips empty 0 || fail "an empty dump is not read as marked"
+pass "boot-success skips the mark only when the booted slot's dump says successful"
+
 ./install "$tmp/root" "$tmp/build"
 for f in usr/bin/reboot-to usr/bin/omamobile-bootctl usr/bin/omamobile-boot-success \
          usr/lib/systemd/system/omamobile-boot-success.service \

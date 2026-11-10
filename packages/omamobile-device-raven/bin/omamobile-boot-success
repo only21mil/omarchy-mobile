@@ -21,7 +21,7 @@ done
 [[ -n "$dev" ]] || { echo "devinfo partition not found"; exit 1; }
 disk=/dev/$(basename "$(dirname "$(readlink -f "/sys/class/block/${dev#/dev/}")")")
 
-if omamobile-bootctl dump "$dev" | sed -n "/^slot $slot /,/retry-count/p" | grep -q 'successful:  yes'; then
+if omamobile-bootctl dump "$dev" | sed -n "/^slot $slot /,/retry-count/p" | grep -c 'successful:  yes' >/dev/null; then
   echo "slot $slot already marked successful"
   exit 0
 fi
